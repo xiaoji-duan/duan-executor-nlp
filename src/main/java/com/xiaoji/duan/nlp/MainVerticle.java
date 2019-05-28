@@ -218,6 +218,10 @@ public class MainVerticle extends AbstractVerticle {
 				nlpAnalysis(future, text.toString());
 			}
 			
+			if ("MarkupAnalysis".equals(function)) {
+				markupAnalysis(future, text.toString());
+			}
+			
 			if ("IndexAnalysis".equals(function)) {
 				indexAnalysis(future, text.toString());
 			}
@@ -292,6 +296,27 @@ public class MainVerticle extends AbstractVerticle {
 
 			JsonObject output = new JsonObject().put("function", "NlpAnalysis").put("text", text).put("parsed",
 					new JsonObject().put("plain", parsed.toString()).put("names", names).put("times", times)
+							.put("locations", locations));
+
+			block.complete(output);
+
+			mongodb.insert("nlp_parse_text", output, insert -> {
+			});
+		}, false, futureNlpAnalysis.completer());
+
+	}
+
+	private void markupAnalysis(Future<JsonObject> futureNlpAnalysis, String text) {
+		vertx.executeBlocking((Future<JsonObject> block) -> {
+			Result parsed = NlpAnalysis.parse(text, DicLibrary.get());
+
+			JsonArray meeting = collectWords(parsed.toString(), "meeting");
+			JsonArray names = collectWords(parsed.toString(), "nr");
+			JsonArray times = collectWords(parsed.toString(), "t");
+			JsonArray locations = collectWords(parsed.toString(), "ns");
+
+			JsonObject output = new JsonObject().put("function", "NlpAnalysis").put("text", text).put("parsed",
+					new JsonObject().put("plain", parsed.toString()).put("meeting", meeting).put("names", names).put("times", times)
 							.put("locations", locations));
 
 			block.complete(output);
