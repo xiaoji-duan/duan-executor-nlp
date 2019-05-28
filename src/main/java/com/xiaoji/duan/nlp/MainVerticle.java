@@ -7,20 +7,26 @@ import java.util.List;
 import java.util.Set;
 
 import org.ansj.domain.Result;
+import org.ansj.library.DicLibrary;
 import org.ansj.splitWord.analysis.DicAnalysis;
 import org.ansj.splitWord.analysis.IndexAnalysis;
 import org.ansj.splitWord.analysis.NlpAnalysis;
 import org.ansj.splitWord.analysis.ToAnalysis;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
+import org.thymeleaf.util.StringUtils;
+
+import com.mongodb.operation.FsyncUnlockOperation;
 
 import io.vertx.amqpbridge.AmqpBridge;
 import io.vertx.amqpbridge.AmqpBridgeOptions;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.eventbus.MessageProducer;
+import io.vertx.core.file.FileSystem;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.JsonArray;
@@ -56,6 +62,9 @@ public class MainVerticle extends AbstractVerticle {
 		});
 		connectStompServer();
 
+		// 加载自定义字典
+		loadUserDictionary();
+		
 		thymeleaf = ThymeleafTemplateEngine.create(vertx);
 		TemplateHandler templatehandler = TemplateHandler.create(thymeleaf);
 
@@ -113,6 +122,46 @@ public class MainVerticle extends AbstractVerticle {
 		});
 	}
 
+	private void loadUserDictionary() {
+		FileSystem fs = vertx.fileSystem();
+
+		fs.readFile(config().getString("user.defined.dictionary", "userdefined.json"), handler -> {
+			if (handler.succeeded()) {
+				Buffer result = handler.result();
+				
+				JsonArray defines = null;
+				
+				if (result == null || result.length() < 2) {
+					defines = new JsonArray();
+				} else {
+					try {
+						defines = result.toJsonArray();
+					} catch(Exception e) {
+						e.printStackTrace();
+						defines = new JsonArray();
+					}
+				}
+
+				for (int i  = 0; i < defines.size(); i ++) {
+					JsonObject def = defines.getJsonObject(i);
+					
+					String key = def.getString("key", "dic");
+					String keyword = def.getString("keyword");
+					String nature = def.getString("nature", "userdefine");
+					Integer freq = def.getInteger("freq", 1000);
+					
+					if (keyword == null || StringUtils.isEmpty(keyword)) {
+						continue;
+					}
+					
+					DicLibrary.insert(key, keyword, nature, freq);
+				}
+				
+				System.out.println("User defined dictionary loaded.");
+			}
+		});
+	}
+	
 	private void subscribeTrigger(String trigger) {
 		MessageConsumer<JsonObject> consumer = bridge.createConsumer(trigger);
 		System.out.println("Consumer " + trigger + " subscribed.");
