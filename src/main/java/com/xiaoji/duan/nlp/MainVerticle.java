@@ -12,10 +12,9 @@ import org.ansj.splitWord.analysis.DicAnalysis;
 import org.ansj.splitWord.analysis.IndexAnalysis;
 import org.ansj.splitWord.analysis.NlpAnalysis;
 import org.ansj.splitWord.analysis.ToAnalysis;
+import org.nlpcn.commons.lang.tire.domain.Forest;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.util.StringUtils;
-
-import com.mongodb.operation.FsyncUnlockOperation;
 
 import io.vertx.amqpbridge.AmqpBridge;
 import io.vertx.amqpbridge.AmqpBridgeOptions;
@@ -152,6 +151,12 @@ public class MainVerticle extends AbstractVerticle {
 					
 					if (keyword == null || StringUtils.isEmpty(keyword)) {
 						continue;
+					}
+					
+					Forest forest = DicLibrary.get(key);
+					
+					if (forest == null) {
+						DicLibrary.put(key, "dic", forest);
 					}
 					
 					DicLibrary.insert(key, keyword, nature, freq);
