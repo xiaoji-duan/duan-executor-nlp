@@ -2,8 +2,10 @@ package com.xiaoji.duan.nlp;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.ansj.domain.Result;
@@ -44,6 +46,7 @@ public class MainVerticle extends AbstractVerticle {
 	private ThymeleafTemplateEngine thymeleaf = null;
 	private MongoClient mongodb = null;
 	private AmqpBridge bridge = null;
+	private static Map<String, String> classifywords = new LinkedHashMap<String, String>();
 
 	@Override
 	public void start(Future<Void> startFuture) throws Exception {
@@ -148,9 +151,15 @@ public class MainVerticle extends AbstractVerticle {
 					String keyword = def.getString("keyword");
 					String nature = def.getString("nature", "userdefine");
 					Integer freq = def.getInteger("freq", 1000);
+					String natureword = def.getString("natureword");
+
 					
 					if (keyword == null || StringUtils.isEmpty(keyword)) {
 						continue;
+					}
+					
+					if (natureword != null && !StringUtils.isEmpty(natureword)) {
+						classifywords.put(nature, natureword);
 					}
 					
 					Forest forest = DicLibrary.get(key);
@@ -308,16 +317,23 @@ public class MainVerticle extends AbstractVerticle {
 
 	private void markupAnalysis(Future<JsonObject> futureNlpAnalysis, String text) {
 		vertx.executeBlocking((Future<JsonObject> block) -> {
-			Result parsed = NlpAnalysis.parse(text, DicLibrary.get());
+			Result parsed = DicAnalysis.parse(text, DicLibrary.get());
 
-			JsonArray meeting = collectWords(parsed.toString(), "meeting");
-			JsonArray names = collectWords(parsed.toString(), "nr");
-			JsonArray times = collectWords(parsed.toString(), "t");
-			JsonArray locations = collectWords(parsed.toString(), "ns");
-
-			JsonObject output = new JsonObject().put("function", "NlpAnalysis").put("text", text).put("parsed",
-					new JsonObject().put("plain", parsed.toString()).put("meeting", meeting).put("names", names).put("times", times)
-							.put("locations", locations));
+			JsonArray markup = new JsonArray();
+			
+			for (Map.Entry<String, String> entry : classifywords.entrySet()) {
+				String classify = entry.getKey();
+				String classifyword = entry.getValue();
+				
+				JsonArray target = collectWords(parsed.toString(), classify);
+				
+				if (target != null && !target.isEmpty()) {
+					markup.add(classifyword);
+				}
+			}
+			
+			JsonObject output = new JsonObject().put("function", "MarkupAnalysis").put("text", text).put("parsed",
+					new JsonObject().put("plain", parsed.toString()).put("markup", markup));
 
 			block.complete(output);
 
