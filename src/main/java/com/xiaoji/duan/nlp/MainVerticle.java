@@ -213,6 +213,8 @@ public class MainVerticle extends AbstractVerticle {
 
 					MessageProducer<JsonObject> producer = bridge.createProducer(next);
 					producer.send(new JsonObject().put("body", nextctx));
+					producer.end();
+
 					System.out.println("Consumer " + consumer + " send to [" + next + "] result [" + nextctx.size() + "]");
 				} else {
 					handler.cause().printStackTrace();
